@@ -3,7 +3,8 @@
 ---
 
 metadata:
-  infraProvider: ""
+  infraProvider: "azure"
+  enableCsiDriver: false
 
 #! User configurable values for VSPHERE_STORAGE_CLASS_ID
 

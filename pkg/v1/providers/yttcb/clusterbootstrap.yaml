@@ -1,7 +1,9 @@
 #@ load("@ytt:assert", "assert")
 #@ load("@ytt:data", "data")
 #@ load("@ytt:ip", "ip")
+#@ load("@ytt:yaml", "yaml")
 #@ load("lib/helpers.star", "get_tkr_version_from_tkr_name")
+#@ load("lib/helpers.star", "enable_csi_driver")
 
 #@ vsphereControlPlaneEndpointAsCidr = ""
 #@ if data.values.VSPHERE_CONTROL_PLANE_ENDPOINT:
@@ -39,8 +41,12 @@
 #@           data.values.USE_TOPOLOGY_CATEGORIES)
 #@ end
 
+#@ def storage_class_configs_exist():
+#@   return data.values.ENABLE_DEFAULT_STORAGE_CLASS and data.values.PROVIDER_TYPE != "tkg-service-vsphere" and data.values.PROVIDER_TYPE != "docker"
+#@ end
+
 #@ def should_create_clusterbootstrap():
-#@   return data.values.CNI != "antrea" or antrea_configs_exist() or vspherecsi_configs_exist() or vspherecpi_configs_exist()
+#@   return data.values.CNI != "antrea" or antrea_configs_exist() or vspherecsi_configs_exist() or vspherecpi_configs_exist() or storage_class_configs_exist()
 #@ end
 
 #@ if antrea_configs_exist():
@@ -171,6 +177,52 @@ spec:
       region: #@ data.values.VSPHERE_REGION
       useTopologyCategories: #@ data.values.USE_TOPOLOGY_CATEGORIES
 #@ end
+
+#@ def aws_storage_class():
+---
+metadata:
+  infraProvider: aws
+  enableCsiDriver: #@ enable_csi_driver()
+#@ end
+
+#@ def vsphere_storage_class():
+---
+metadata:
+  infraProvider: vsphere
+  enableCsiDriver: #@ enable_csi_driver()
+#@ if data.values.VSPHERE_STORAGE_POLICY_ID != "":
+VSPHERE_STORAGE_POLICY_ID: #@ data.values.VSPHERE_STORAGE_POLICY_ID
+#@ end
+#@ end
+
+
+#@ def azure_storage_class():
+---
+metadata:
+  infraProvider: azure
+  enableCsiDriver: #@ enable_csi_driver()
+#@ end
+
+#@ if data.values.PROVIDER_TYPE != "tkg-service-vsphere" and data.values.PROVIDER_TYPE != "docker":
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: #@ data.values.CLUSTER_NAME + "-default-storage-class-value"
+stringData:
+#@ if data.values.PROVIDER_TYPE == "vsphere":
+  value: #@ yaml.encode(vsphere_storage_class())
+#@ end
+
+#@ if data.values.PROVIDER_TYPE == "aws":
+  value: #@ yaml.encode(aws_storage_class())
+#@ end
+
+#@ if data.values.PROVIDER_TYPE == "azure":
+  value: #@ yaml.encode(azure_storage_class())
+#@ end
+
+#@ end
 ---
 #@ if should_create_clusterbootstrap():
 apiVersion: run.tanzu.vmware.com/v1alpha3
@@ -181,22 +233,23 @@ metadata:
   annotations:
     tkg.tanzu.vmware.com/add-missing-fields-from-tkr: #@ data.values.KUBERNETES_RELEASE
 spec:
+  #@ if data.values.CNI == "antrea" and antrea_configs_exist():
   cni:
-    #@ if data.values.CNI == "antrea":
     refName: antrea*
     valuesFrom:
       providerRef:
         apiGroup: cni.tanzu.vmware.com
         kind: AntreaConfig
         name: #@ data.values.CLUSTER_NAME
-    #@ elif data.values.CNI == "calico":
+  #@ elif data.values.CNI == "calico":
+  cni:
     refName: calico*
     valuesFrom:
       providerRef:
         apiGroup: cni.tanzu.vmware.com
         kind: CalicoConfig
         name: #@ data.values.CLUSTER_NAME
-    #@ end
+  #@ end
   #@ if vspherecpi_configs_exist() and not data.values.IS_WINDOWS_WORKLOAD_CLUSTER:
   cpi:
     refName: vsphere-cpi*
@@ -221,5 +274,8 @@ spec:
     - refName: metrics-server*
     - refName: secretgen-controller*
     - refName: pinniped*
+    - refName: tkg-storageclass*
+      valuesFrom:
+        secretRef: #@ data.values.CLUSTER_NAME + "-default-storage-class-value"
 #@ end
 

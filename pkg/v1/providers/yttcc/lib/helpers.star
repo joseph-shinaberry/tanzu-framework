@@ -333,3 +333,24 @@ def get_labels_map_from_string(labelString):
    end
    return labelMap
 end
+
+def compare_semver_versions(a, b):
+  a_array = regexp.replace("v?(\d+\.\d+\.\d+).*", a, "$1").split(".")
+  b_array = regexp.replace("v?(\d+\.\d+\.\d+).*", b, "$1").split(".")
+  for i in range(len(a_array)):
+    if int(a_array[i]) > int(b_array[i]):
+      return 1
+    elif int(a_array[i]) < int(b_array[i]):
+      return -1
+    end
+  end
+  return 0
+end
+
+def enable_csi_driver():
+  tkrVersion = get_tkr_version_from_tkr_name(data.values.KUBERNETES_RELEASE)
+  if compare_semver_versions(tkrVersion, "v1.23.0") >= 0:
+     return True
+  end
+  return False
+end
