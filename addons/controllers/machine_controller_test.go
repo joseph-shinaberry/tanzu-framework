@@ -4,6 +4,7 @@
 package controllers
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clusterapiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,6 +22,7 @@ import (
 
 	kapppkgiv1alpha1 "github.com/vmware-tanzu/carvel-kapp-controller/pkg/apis/packaging/v1alpha1"
 	addontypes "github.com/vmware-tanzu/tanzu-framework/addons/pkg/types"
+	"github.com/vmware-tanzu/tanzu-framework/addons/pkg/util"
 	"github.com/vmware-tanzu/tanzu-framework/addons/test/testutil"
 	runtanzuv1alpha3 "github.com/vmware-tanzu/tanzu-framework/apis/run/v1alpha3"
 )
@@ -68,6 +72,37 @@ var _ = Describe("Machine Reconciler", func() {
 			copiedCluster := cluster.DeepCopy()
 			copiedCluster.Status.Phase = string(clusterapiv1beta1.ClusterPhaseProvisioned)
 			Expect(k8sClient.Status().Update(ctx, copiedCluster)).To(Succeed())
+
+			// Note that as long as the providerRef is defined, there is no such case that the final
+			// state of the secretRef in the provider config status remain not shown.
+			// To avoid unconfigured packages to be bootstraped, the cluster bootstrap process will be blocked
+			// until the secretRef is found.
+			// We simulate a controller adding secretRef to foobar provider status.
+			var gvr schema.GroupVersionResource
+			var object *unstructured.Unstructured
+			gvr = schema.GroupVersionResource{Group: "run.tanzu.vmware.com", Version: "v1alpha1", Resource: "foobars"}
+
+			providerName := fmt.Sprintf("%s-foobar-package", clusterName)
+
+			s := &corev1.Secret{}
+			s.Name = util.GenerateDataValueSecretName(clusterName, "foobar.example.com")
+			s.Namespace = clusterNamespace
+			s.StringData = map[string]string{}
+			s.StringData["values.yaml"] = string("foobar")
+			Expect(k8sClient.Create(ctx, s)).To(Succeed())
+
+			// Reconciliation failed but ClusterBootstrap and foobar provider created.
+			Eventually(func() bool {
+				var err error
+				object, err = dynamicClient.Resource(gvr).Namespace(clusterNamespace).Get(ctx, providerName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				return true
+			}, waitTimeout, pollingInterval).Should(BeTrue())
+			Expect(unstructured.SetNestedField(object.Object, s.Name, "status", "secretRef")).To(Succeed())
+			_, err := dynamicClient.Resource(gvr).Namespace(clusterNamespace).UpdateStatus(ctx, object, metav1.UpdateOptions{})
+			Expect(err).ToNot(HaveOccurred())
 
 			By("check clusterboostrap has been marked with finalizer")
 			clusterBootstrap := &runtanzuv1alpha3.ClusterBootstrap{}
@@ -143,7 +178,7 @@ var _ = Describe("Machine Reconciler", func() {
 
 			By("Additionalpackage installs should exist for each additional package in the clusterBoostrap")
 			pkgInstallsList := &kapppkgiv1alpha1.PackageInstallList{}
-			err := k8sClient.List(ctx, pkgInstallsList)
+			err = k8sClient.List(ctx, pkgInstallsList)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(hasPackageInstalls(ctx, k8sClient, cluster, addonNamespace,
 				clusterBootstrap.Spec.AdditionalPackages, setupLog)).To(BeTrue())

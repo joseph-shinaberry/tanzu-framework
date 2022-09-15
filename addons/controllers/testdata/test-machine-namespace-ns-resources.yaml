@@ -40,6 +40,11 @@ spec:
       cidrBlocks: [ "192.168.0.0/16","fd00:100:96::/48" ]
     services:
       cidrBlocks: [ "192.168.0.0/16","fd00:100:96::/48" ]
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: machine-cluster-control-plane
+    namespace: machine-namespace
   topology:
     class: machine-class
     version: v1.22.3
@@ -533,3 +538,50 @@ spec:
               - .imgpkg/images.yml
       deploy:
         - kapp: {}
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: machine-cluster-control-plane
+  namespace: machine-namespace
+spec:
+  kubeadmConfigSpec: {}
+  machineTemplate:
+    infrastructureRef: {}
+  replicas: 5
+  version: v1.22.3
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereCluster
+metadata:
+  name: machine-cluster
+  namespace: machine-namespace
+spec:
+  thumbprint: test-thumbprint
+  server: vsphere-server.local
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereMachineTemplate
+metadata:
+  name: machine-cluster-control-plane
+  namespace: machine-namespace
+spec:
+  template:
+    spec:
+      datacenter: dc0
+      template: /dc0/vm/photon-3-kube-v1.22.3+vmware.1-tkg.2
+      network:
+        devices:
+        - networkName: test-network
+          dhcp6: true
+          dhcp4: false
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: machine-cluster
+  namespace: machine-namespace
+data:
+  password: QWRtaW4hMjM= # Admin!23
+  username: YWRtaW5pc3RyYXRvckB2c3BoZXJlLmxvY2Fs # administrator@vsphere.local

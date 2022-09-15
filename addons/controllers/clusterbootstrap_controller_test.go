@@ -53,6 +53,7 @@ var _ = Describe("ClusterBootstrap Reconciler", func() {
 		foobar1CarvelPackageRefName = "foobar1.example.com"
 		foobar1CarvelPackageName    = "foobar1.example.com.1.17.2"
 		foobar2CarvelPackageRefName = "foobar2.example.com"
+		foobar3CarvelPackageRefName = "foobar3.example.com"
 		foobar                      = "foobar"
 	)
 
@@ -137,6 +138,50 @@ var _ = Describe("ClusterBootstrap Reconciler", func() {
 					return false
 				}, waitTimeout, pollingInterval).Should(BeTrue())
 
+				// After the ClusterBootstrap is generated, all the providers are cloned to the target namespace.
+				// But for provider FooBar, it does not have a controller to generate the data values secret.
+				// Simulate a controller adding secretRef to provider status and
+				// verify that a data-values secret has been created for the Foobar package
+				var gvr schema.GroupVersionResource
+				var object *unstructured.Unstructured
+				gvr = schema.GroupVersionResource{Group: "run.tanzu.vmware.com", Version: "v1alpha1", Resource: "foobars"}
+
+				providerName := fmt.Sprintf("%s-foobar-package", clusterName)
+
+				By("patching foobar provider object's status resource with a secret ref", func() {
+					s := &corev1.Secret{}
+					s.Name = util.GenerateDataValueSecretName(clusterName, foobarCarvelPackageRefName)
+					s.Namespace = clusterNamespace
+					s.StringData = map[string]string{}
+					s.StringData["values.yaml"] = string(foobar)
+					Expect(k8sClient.Create(ctx, s)).To(Succeed())
+
+					// Reconciliation failed but ClusterBootstrap and foobar provider created.
+					Eventually(func() bool {
+						var err error
+						object, err = dynamicClient.Resource(gvr).Namespace(clusterNamespace).Get(ctx, providerName, metav1.GetOptions{})
+						if err != nil {
+							return false
+						}
+						return true
+					}, waitTimeout, pollingInterval).Should(BeTrue())
+					Expect(unstructured.SetNestedField(object.Object, s.Name, "status", "secretRef")).To(Succeed())
+					_, err := dynamicClient.Resource(gvr).Namespace(clusterNamespace).UpdateStatus(ctx, object, metav1.UpdateOptions{})
+					Expect(err).ToNot(HaveOccurred())
+
+					Eventually(func() bool {
+						s := &corev1.Secret{}
+						if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: constants.TKGSystemNS, Name: util.GenerateDataValueSecretName(clusterName, foobarCarvelPackageRefName)}, s); err != nil {
+							return false
+						}
+						if string(s.Data["values.yaml"]) != foobar {
+							return false
+						}
+
+						return true
+					}, waitTimeout, pollingInterval).Should(BeTrue())
+				})
+
 				By("cluster should be marked with finalizer")
 				Eventually(func() bool {
 					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)
@@ -200,7 +245,7 @@ var _ = Describe("ClusterBootstrap Reconciler", func() {
 				Expect(clusterBootstrap.Spec.CNI.RefName).To(Equal("antrea.tanzu.vmware.com.1.2.3--vmware.1-tkg.1"))
 				Expect(*clusterBootstrap.Spec.CNI.ValuesFrom.ProviderRef.APIGroup).To(Equal("cni.tanzu.vmware.com"))
 				Expect(clusterBootstrap.Spec.CNI.ValuesFrom.ProviderRef.Kind).To(Equal("AntreaConfig"))
-				providerName := fmt.Sprintf("%s-antrea-package", clusterName)
+				providerName = fmt.Sprintf("%s-antrea-package", clusterName)
 				Expect(clusterBootstrap.Spec.CNI.ValuesFrom.ProviderRef.Name).To(Equal(providerName))
 
 				By("verifying that the proxy related annotations are populated to cluster object properly")
@@ -222,8 +267,6 @@ var _ = Describe("ClusterBootstrap Reconciler", func() {
 				}, waitTimeout, pollingInterval).Should(BeTrue())
 
 				By("verifying that the providerRef from additionalPackages is cloned into cluster namespace and ownerReferences set properly")
-				var gvr schema.GroupVersionResource
-				var object *unstructured.Unstructured
 				// Verify providerRef exists and also the cloned provider object with ownerReferences to cluster and ClusterBootstrap
 				Eventually(func() bool {
 					Expect(len(clusterBootstrap.Spec.AdditionalPackages) > 1).To(BeTrue())
@@ -325,34 +368,6 @@ var _ = Describe("ClusterBootstrap Reconciler", func() {
 						// TKGS data value should not exist because no VirtualMachine is related to cluster1
 						_, ok := s.Data[constants.TKGSDataValueFileName]
 						Expect(ok).ToNot(BeTrue())
-						return true
-					}, waitTimeout, pollingInterval).Should(BeTrue())
-				})
-
-				// Simulate a controller adding secretRef to provider status and
-				// verify that a data-values secret has been created for the Foobar package
-				By("patching foobar provider object's status resource with a secret ref", func() {
-					s := &corev1.Secret{}
-					s.Name = util.GenerateDataValueSecretName(clusterName, foobarCarvelPackageRefName)
-					s.Namespace = clusterNamespace
-					s.StringData = map[string]string{}
-					s.StringData["values.yaml"] = string(foobar)
-					Expect(k8sClient.Create(ctx, s)).To(Succeed())
-
-					Expect(unstructured.SetNestedField(object.Object, s.Name, "status", "secretRef")).To(Succeed())
-
-					_, err := dynamicClient.Resource(gvr).Namespace(clusterNamespace).UpdateStatus(ctx, object, metav1.UpdateOptions{})
-					Expect(err).ToNot(HaveOccurred())
-
-					Eventually(func() bool {
-						s := &corev1.Secret{}
-						if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: constants.TKGSystemNS, Name: util.GenerateDataValueSecretName(clusterName, foobarCarvelPackageRefName)}, s); err != nil {
-							return false
-						}
-						if string(s.Data["values.yaml"]) != foobar {
-							return false
-						}
-
 						return true
 					}, waitTimeout, pollingInterval).Should(BeTrue())
 				})
@@ -550,6 +565,27 @@ var _ = Describe("ClusterBootstrap Reconciler", func() {
 					cluster.Annotations[constants.ClusterPauseLabel] = newTKRVersion
 					Expect(k8sClient.Update(ctx, cluster)).To(Succeed())
 
+					providerName := fmt.Sprintf("%s-foobar3-package", clusterName)
+
+					s := &corev1.Secret{}
+					s.Name = util.GenerateDataValueSecretName(clusterName, foobar3CarvelPackageRefName)
+					s.Namespace = clusterNamespace
+					s.StringData = map[string]string{}
+					s.StringData["values.yaml"] = string(foobar)
+					Expect(k8sClient.Create(ctx, s)).To(Succeed())
+
+					Eventually(func() bool {
+						var err error
+						object, err = dynamicClient.Resource(gvr).Namespace(clusterNamespace).Get(ctx, providerName, metav1.GetOptions{})
+						if err != nil {
+							return false
+						}
+						return true
+					}, waitTimeout, pollingInterval).Should(BeTrue())
+					Expect(unstructured.SetNestedField(object.Object, s.Name, "status", "secretRef")).To(Succeed())
+					_, err := dynamicClient.Resource(gvr).Namespace(clusterNamespace).UpdateStatus(ctx, object, metav1.UpdateOptions{})
+					Expect(err).ToNot(HaveOccurred())
+
 					// Wait for ClusterBootstrap upgrade reconciliation
 					Eventually(func() bool {
 						upgradedClusterBootstrap := &runtanzuv1alpha3.ClusterBootstrap{}
@@ -596,7 +632,10 @@ var _ = Describe("ClusterBootstrap Reconciler", func() {
 
 						// The cluster should be unpaused
 						Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: clusterNamespace, Name: clusterName}, cluster)).To(Succeed())
-						Expect(cluster.Spec.Paused).ToNot(BeTrue())
+						// Expect(cluster.Spec.Paused).ToNot(BeTrue())
+						if cluster.Spec.Paused == true {
+							return false
+						}
 						if cluster.Annotations != nil {
 							_, ok := cluster.Annotations[constants.ClusterPauseLabel]
 							Expect(ok).ToNot(BeTrue())

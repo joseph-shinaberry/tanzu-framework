@@ -1211,8 +1211,11 @@ func (r *ClusterBootstrapReconciler) GetDataValueSecretNameFromBootstrapPackage(
 			if !found {
 				// In this case, we expect the secretRef to be present under status subresource and its value gets updated by
 				// the corresponding controller. However, the config controller might not create the secret in time.
-				r.Log.Info("provider status does not have secretRef", "GVR", gvr)
-				return "", nil
+				// Note that as long as the providerRef is defined, there is no such case that the final state of the secretRef remain not shown.
+				// So we return a error for this to wait and reconcile.
+				err = fmt.Errorf("provider %s does not have secretRef on its status", provider.GetName())
+				r.Log.Error(err, "", "GVR", gvr)
+				return "", err
 			}
 			return secretName, nil
 		}
