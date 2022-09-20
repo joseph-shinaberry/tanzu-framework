@@ -498,6 +498,9 @@ test: generate manifests build-cli-mocks ## Run tests
 	# Test feature gates
 	$(MAKE) test -C featuregates
 
+	# Cluster plugin tests
+	$(MAKE) test -C cmd/cli/plugin/cluster
+
 .PHONY: test-cli
 test-cli: build-cli-mocks ## Run tests
 	$(GO) test  ./pkg/v1/auth/... ./pkg/v1/builder/...  ./pkg/v1/encoding/... ./pkg/v1/grpc/...
