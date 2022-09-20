@@ -33,6 +33,37 @@ FILES_TO_IGNORE+=yttcc yttcb cconly cc.yaml
 endif
 FILES_TO_IGNORE_REGEX=$(subst $(space) ,\|,$(FILES_TO_IGNORE))
 
+
+help:  ## Display this help
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+verify-build:  ## verify-build verifies the changes with generated files
+
+all: lint ## run all target
+
+.PHONY: build-cli ## build tkg cli with existing provider changes
+build-cli:
+	CLI_REPO=${CLI_REPO} ${CLI_REPO}/hack/clustergen/rebuild-cli.sh ${PWD}
+
+## --------------------------------------
+## Linting
+## --------------------------------------
+
+.PHONY: lint
+lint: ## Run YAML linter
+	yamllint ${CLI_REPO}/providers -c .yamllint
+
+## --------------------------------------
+## Generate provider templates
+## --------------------------------------
+
+.PHONY: clean-providers
+clean-providers: ## cleans provider-bundle
+	# cleanup old provider bundles
+	@rm -rf client/manifest/providers.zip
+	@rm -rf provider-bundle || true
+	@mkdir -p ${PROVIDER_BUNDLE_DIR}
+
 setup-provider-for-generation: clean-providers
 	# using temporary directory to extract all files which needs to bundle
 	find . -type f | grep -v "${FILES_TO_IGNORE_REGEX}" | xargs tar cf - -T - | tar -C ${PROVIDER_BUNDLE_DIR} -x
