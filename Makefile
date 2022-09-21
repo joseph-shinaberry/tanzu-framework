@@ -502,8 +502,8 @@ test: generate manifests build-cli-mocks ## Run tests
 	# Cluster plugin tests
 	$(MAKE) test -C cmd/cli/plugin/cluster
 
-        # Cluster plugin tests
-        $(MAKE) test -C cmd/cli/plugin/managementcluster
+	# Cluster plugin tests
+	$(MAKE) test -C cmd/cli/plugin/managementcluster
 
 .PHONY: test-cli
 test-cli: build-cli-mocks ## Run tests
