@@ -52,10 +52,6 @@ LD_FLAGS += -X 'github.com/vmware-tanzu/tanzu-framework/cli/core/pkg/buildinfo.D
 LD_FLAGS += -X 'github.com/vmware-tanzu/tanzu-framework/cli/core/pkg/buildinfo.SHA=$(BUILD_SHA)'
 LD_FLAGS += -X 'github.com/vmware-tanzu/tanzu-framework/cli/core/pkg/buildinfo.Version=$(BUILD_VERSION)'
 
-LD_FLAGS += -X 'github.com/vmware-tanzu/tanzu-framework/tkg/buildinfo.Date=$(BUILD_DATE)'
-LD_FLAGS += -X 'github.com/vmware-tanzu/tanzu-framework/tkg/buildinfo.SHA=$(BUILD_SHA)'
-LD_FLAGS += -X 'github.com/vmware-tanzu/tanzu-framework/tkg/buildinfo.Version=$(BUILD_VERSION)'
-
 ifndef ENABLE_CONTEXT_AWARE_PLUGIN_DISCOVERY
 ENABLE_CONTEXT_AWARE_PLUGIN_DISCOVERY = "true"
 endif
