@@ -35,6 +35,9 @@ const (
 	// CSIAddonName is name of the vsphere-csi addon
 	CSIAddonName = "vsphere-csi"
 
+	// AzureDiskCSIAddonName is name of the azure-disk-csi addon
+	AzureDiskCSIAddonName = "azure-disk-csi"
+
 	// TKGBomNamespace is the TKG add on BOM namespace.
 	TKGBomNamespace = "tkr-system"
 
@@ -293,4 +296,7 @@ var (
 
 	// KappControllerConfigKind is the Kind for KappControllerConfig object
 	KappControllerConfigKind = reflect.TypeOf(runv1alpha3.KappControllerConfig{}).Name()
+
+	// AzureDiskCSIConfigKind is the Kind for csi AwsEbsCSIConfig object
+	AzureDiskCSIConfigKind = reflect.TypeOf(csiv1alpha1.AzureDiskCSIConfig{}).Name()
 )

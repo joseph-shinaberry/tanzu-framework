@@ -52,8 +52,9 @@ type CreateClusterOptions struct {
 	Edition string
 }
 
-//nolint:gocritic
 // CreateCluster create tkg cluster
+//
+//nolint:gocritic
 func (t *tkgctl) CreateCluster(cc CreateClusterOptions) error {
 	isTKGSCluster, err := t.tkgClient.IsPacificManagementCluster()
 	if err != nil {
