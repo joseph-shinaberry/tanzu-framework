@@ -11,6 +11,7 @@ replace (
 	github.com/vmware-tanzu/tanzu-framework/cli/runtime => ../../../../cli/runtime
 	github.com/vmware-tanzu/tanzu-framework/tkg => ../../../../tkg
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.1.5
+	sigs.k8s.io/kind => sigs.k8s.io/kind v0.11.1
 )
 
 require (
