@@ -13,6 +13,7 @@ import (
 	"github.com/vmware-tanzu/tanzu-framework/cli/runtime/buildinfo"
 	"github.com/vmware-tanzu/tanzu-framework/cli/runtime/config"
 	"github.com/vmware-tanzu/tanzu-framework/cli/runtime/plugin"
+	"github.com/vmware-tanzu/tanzu-framework/cli/runtime/buildinfo"
 
 	"github.com/vmware-tanzu/tanzu-framework/tkg/tkgctl"
 )
