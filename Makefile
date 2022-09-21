@@ -191,10 +191,7 @@ prep-build-cli: ensure-pinniped-repo  ## Prepare for building the CLI
 	EMBED_PROVIDERS_TAG=embedproviders
 ifeq "${BUILD_TAGS}" "${EMBED_PROVIDERS_TAG}"
 	make -C providers -f Makefile generate-provider-bundle-zip
-<<<<<<< HEAD
 	cp -f ${PROVIDER_BUNDLE_ZIP} $(TKG_PROVIDER_BUNDLE_ZIP)
-=======
->>>>>>> 9ed92562... Create a top-level directory for provider template
 endif
 
 .PHONY: configure-buildtags-%
@@ -687,10 +684,7 @@ clustergen: ## Generate diff between 'before' and 'after' of cluster configurati
 .PHONY: generate-embedproviders
 generate-embedproviders: ## Generate provider bundle to be embedded for local testing
 	make -C providers -f Makefile generate-provider-bundle-zip
-<<<<<<< HEAD
 	cp -f ${PROVIDER_BUNDLE_ZIP} $(TKG_PROVIDER_BUNDLE_ZIP)
-=======
->>>>>>> 9ed92562... Create a top-level directory for provider template
 
 ## --------------------------------------
 ##@ TKG integration tests
